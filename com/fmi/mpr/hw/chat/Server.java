@@ -14,7 +14,7 @@ public class Server {
 	
 	final static int SERVER_PORT = 8080;
 	
-	final static int BUFFER_SIZE = 4096;
+	final static int BUFFER_SIZE = 4096*3;
 
 	final static String REGISTER_PREFIX = ">";
 	final static String LOGOUT_PREFIX = "<";
@@ -31,36 +31,35 @@ public class Server {
 			System.out.println("Chat room server started!");
 			while (true) {
 				byte[] byteData = new byte[BUFFER_SIZE];
-				DatagramPacket receivedPacketFromClient = new DatagramPacket(byteData, byteData.length);
-				receiveSocket.receive(receivedPacketFromClient);
+				DatagramPacket receivedPacketFromClient = new DatagramPacket(byteData, byteData.length);		// empty packet
+				receiveSocket.receive(receivedPacketFromClient);												// fill packet
 
-				boolean isMessageOnly = false;
+				boolean isRegisterLogout = false;
 				boolean sendToMulticast = true;
 				String messageReceivedFromClient = new String(receivedPacketFromClient.getData(), receivedPacketFromClient.getOffset(),
-						receivedPacketFromClient.getLength());
+						receivedPacketFromClient.getLength());													// stringify the message
 				String nameOfClient = null;
 
-				// register
 				if (messageReceivedFromClient.startsWith(REGISTER_PREFIX)) {
-					nameOfClient = messageReceivedFromClient.substring(1);
-					sendToMulticast = !connectedUsers.contains(nameOfClient);								// whether we should send to multicast
-					registerClient(nameOfClient, receiveSocket, receivedPacketFromClient.getAddress(), receivedPacketFromClient.getPort());
+					nameOfClient = messageReceivedFromClient.substring(REGISTER_PREFIX.length());
+					sendToMulticast = !connectedUsers.contains(nameOfClient);									// whether we should send to multicast, ex: Bat Gergi entered the chat room... used name shouldnt notify room clients
+					registerClient(nameOfClient, receiveSocket, receivedPacketFromClient.getAddress(), receivedPacketFromClient.getPort());		
 					messageReceivedFromClient = nameOfClient + " entered the chat room...";
-					isMessageOnly = true;
+					isRegisterLogout = true;
 				}
-				// logout
+		
 				else if (messageReceivedFromClient.startsWith(LOGOUT_PREFIX)) {
-					nameOfClient = messageReceivedFromClient.substring(1);
+					nameOfClient = messageReceivedFromClient.substring(LOGOUT_PREFIX.length());
 					logoutClient(nameOfClient);
 					messageReceivedFromClient = nameOfClient+ " left the chat room...";
-					isMessageOnly = true;
+					isRegisterLogout = true;
 				} else {
 					nameOfClient = messageReceivedFromClient.split(":")[0];
 				}
 
-				if (sendToMulticast && (isMessageOnly || connectedUsers.contains(nameOfClient))) {
+				if (sendToMulticast && (isRegisterLogout || connectedUsers.contains(nameOfClient))) {
 
-					byte[] bytesForMulticast = isMessageOnly ? messageReceivedFromClient.getBytes() : receivedPacketFromClient.getData();	// bytes for register/logout or dataPacket
+					byte[] bytesForMulticast = isRegisterLogout ? messageReceivedFromClient.getBytes() : receivedPacketFromClient.getData();	// bytes for register/logout or dataPacket
 
 					InetAddress address = InetAddress.getByName(MULTICAST_IP_ADDRESS);
 					DatagramPacket multicastPacket = new DatagramPacket(bytesForMulticast, bytesForMulticast.length, address,
